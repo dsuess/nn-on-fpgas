@@ -1,0 +1,4 @@
+- base of Amazon FPGA AMI
+- install pyenv (https://gist.github.com/ysaotome/7956676)
+- yum install libffi-devel
+- install python 3.8.x through pyenv

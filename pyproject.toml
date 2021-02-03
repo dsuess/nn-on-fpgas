@@ -1,0 +1,32 @@
+[tool.poetry]
+name = "ml-on-fpga"
+version = "0.1.0"
+description = ""
+authors = ["Daniel Suess <daniel@dsuess.me>"]
+license = "APGL"
+packages = [
+    { include = "utils" }
+]
+
+
+[tool.poetry.dependencies]
+python = "^3.8"
+tinygrad = { git = "https://github.com/geohot/tinygrad", rev = "f0cc2b66f8e1813525fe68f7f9f98805732c920e" }
+requests = "^2.25.1"
+typer = "^0.3.2"
+tqdm = "^4.56.0"
+
+[tool.poetry.dev-dependencies]
+black = "^20.8b1"
+pytest = "^6.2.2"
+isort = "^5.7.0"
+pdbpp = "^0.10.2"
+
+
+[tool.pytest.ini_options]
+addopts = "--doctest-modules --strict"
+
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"
