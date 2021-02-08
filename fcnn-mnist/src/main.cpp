@@ -22,23 +22,42 @@
 #include "xcl2.hpp"
 #include "utils.hpp"
 
-int main(int argc, const char *argv[])
+typedef struct DeviceHandle
 {
+    cl::Device device;
+    cl::CommandQueue q;
+    cl::Context context;
+} CLContext;
+
+DeviceHandle setup_handle()
+{
+    DeviceHandle result;
     std::vector<cl::Device> devices = xcl::get_xil_devices();
-    cl::Device device = devices[0];
+    result.device = devices[0];
 
     // Creating Context and Command Queue for selected Device
-    cl::Context context(device);
-    cl::CommandQueue cqueue(context, device, CL_QUEUE_PROFILING_ENABLE | CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE);
-    std::string devName = device.getInfo<CL_DEVICE_NAME>();
-    printf("INFO: Found Device=%s\n", devName.c_str());
+    result.context = cl::Context(result.device);
+    result.q = cl::CommandQueue(result.context, result.device, CL_QUEUE_PROFILING_ENABLE | CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE);
+    std::string devName = result.device.getInfo<CL_DEVICE_NAME>();
+    std::cout << "INFO: Found Device=" << devName << std::endl;
+    return result;
+}
 
-    std::string xclbin_path = xcl::find_binary_file(devName, "matmul_kernel");
+cl::Kernel load_kernel(const std::string &name, const DeviceHandle &handle)
+{
+    const std::string devName = handle.device.getInfo<CL_DEVICE_NAME>();
+    std::string xclbin_path = xcl::find_binary_file(devName, name);
     cl::Program::Binaries xclBins = xcl::import_binary_file(xclbin_path);
-    devices.resize(1);
-    cl::Program program(context, devices, xclBins);
-    cl::Kernel kernel(program, "matmul_kernel");
-    std::cout << "INFO: Kernel has been created" << std::endl;
+    cl::Program program(handle.context, {handle.device}, xclBins);
+    cl::Kernel kernel(program, name.c_str());
+    std::cout << "INFO: Kernel '" << name << "' has been created" << std::endl;
+    return kernel;
+}
+
+int main(int argc, const char *argv[])
+{
+    DeviceHandle handle = setup_handle();
+    cl::Kernel kernel = load_kernel("matmul_kernel", handle);
 
     // Initialization of host buffers
     double *dataA;
@@ -53,7 +72,7 @@ int main(int argc, const char *argv[])
 
     // Create device buffer and map dev buf to host buf
     std::vector<cl::Buffer> buffer(1);
-    buffer[0] = cl::Buffer(context, CL_MEM_EXT_PTR_XILINX | CL_MEM_USE_HOST_PTR | CL_MEM_READ_WRITE,
+    buffer[0] = cl::Buffer(handle.context, CL_MEM_EXT_PTR_XILINX | CL_MEM_USE_HOST_PTR | CL_MEM_READ_WRITE,
                            sizeof(double) * inout_size, &mext_io[0]);
 
     // Data transfer from host buffer to device buffer
@@ -64,22 +83,22 @@ int main(int argc, const char *argv[])
     std::vector<cl::Memory> ob_io;
     ob_io.push_back(buffer[0]);
 
-    cqueue.enqueueMigrateMemObjects(ob_io, 0, nullptr, &kernel_evt[0][0]); // 0 : migrate from host to dev
-    cqueue.finish();
+    handle.q.enqueueMigrateMemObjects(ob_io, 0, nullptr, &kernel_evt[0][0]); // 0 : migrate from host to dev
+    handle.q.finish();
     std::cout << "INFO: Finish data transfer from host to device" << std::endl;
 
     // Setup kernel
     // cholesky_kernel.setArg(0, dataAN);
     // cholesky_kernel.setArg(1, buffer[0]);
-    // cqueue.finish();
+    // handle.q.finish();
     // std::cout << "INFO: Finish kernel setup" << std::endl;
 
-    // cqueue.enqueueTask(kernel, nullptr, nullptr);
-    cqueue.finish();
+    // handle.q.enqueueTask(kernel, nullptr, nullptr);
+    handle.q.finish();
 
     // Data transfer from device buffer to host buffer
-    cqueue.enqueueMigrateMemObjects(ob_io, 1, nullptr, nullptr); // 1 : migrate from dev to host
-    cqueue.finish();
+    handle.q.enqueueMigrateMemObjects(ob_io, 1, nullptr, nullptr); // 1 : migrate from dev to host
+    handle.q.finish();
 
     std::cout << "DONE" << std::endl;
 }
