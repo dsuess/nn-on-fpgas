@@ -20,14 +20,7 @@
 #include <algorithm>
 
 #include "xcl2.hpp"
-#include "utils.hpp"
-
-typedef struct DeviceHandle
-{
-    cl::Device device;
-    cl::CommandQueue q;
-    cl::Context context;
-} CLContext;
+#include "matrix.hpp"
 
 DeviceHandle setup_handle()
 {
@@ -59,33 +52,10 @@ int main(int argc, const char *argv[])
     DeviceHandle handle = setup_handle();
     cl::Kernel kernel = load_kernel("matmul_kernel", handle);
 
-    // Initialization of host buffers
-    double *dataA;
-    const int inout_size = 10;
-    dataA = aligned_alloc<double>(inout_size);
+    Matrix matrixA = Matrix::constant(3, 3, 10., 4096);
+    std::cout << matrixA.to_string();
 
-    // DDR Settings
-    std::vector<cl_mem_ext_ptr_t> mext_io(1);
-    mext_io[0].flags = XCL_MEM_DDR_BANK1;
-    mext_io[0].obj = dataA;
-    mext_io[0].param = 0;
-
-    // Create device buffer and map dev buf to host buf
-    std::vector<cl::Buffer> buffer(1);
-    buffer[0] = cl::Buffer(handle.context, CL_MEM_EXT_PTR_XILINX | CL_MEM_USE_HOST_PTR | CL_MEM_READ_WRITE,
-                           sizeof(double) * inout_size, &mext_io[0]);
-
-    // Data transfer from host buffer to device buffer
-    std::vector<std::vector<cl::Event>> kernel_evt(2);
-    kernel_evt[0].resize(1);
-    kernel_evt[1].resize(1);
-
-    std::vector<cl::Memory> ob_io;
-    ob_io.push_back(buffer[0]);
-
-    handle.q.enqueueMigrateMemObjects(ob_io, 0, nullptr, &kernel_evt[0][0]); // 0 : migrate from host to dev
-    handle.q.finish();
-    std::cout << "INFO: Finish data transfer from host to device" << std::endl;
+    auto buffer = matrixA.get_cl_buffer(handle, XCL_MEM_DDR_BANK1);
 
     // Setup kernel
     // cholesky_kernel.setArg(0, dataAN);
@@ -97,8 +67,6 @@ int main(int argc, const char *argv[])
     handle.q.finish();
 
     // Data transfer from device buffer to host buffer
-    handle.q.enqueueMigrateMemObjects(ob_io, 1, nullptr, nullptr); // 1 : migrate from dev to host
-    handle.q.finish();
 
     std::cout << "DONE" << std::endl;
 }

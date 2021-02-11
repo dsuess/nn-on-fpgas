@@ -1,0 +1,111 @@
+#ifndef NNONFPGA_UTILS
+#define NNONFPGA_UTILS
+
+#include <tuple>
+#include <assert.h>
+#include <iostream>
+#include <sstream>
+#include <vector>
+#include <CL/cl2.hpp>
+
+typedef unsigned int uint;
+
+static const uint DEFAULT_ALIGNMENT = 32;
+
+typedef struct DeviceHandle
+{
+    cl::Device device;
+    cl::CommandQueue q;
+    cl::Context context;
+} DeviceHandle;
+
+// Memory alignment
+template <typename T>
+T *aligned_alloc(std::size_t num, std::size_t alignment = DEFAULT_ALIGNMENT)
+{
+    void *ptr = nullptr;
+    if (posix_memalign(&ptr, alignment, num * sizeof(T)))
+    {
+        throw std::bad_alloc();
+    }
+    return reinterpret_cast<T *>(ptr);
+}
+
+class Matrix
+{
+private:
+    inline uint flatten_idx(const uint row, const uint col) const
+    {
+        assert(row < rows);
+        assert(col < cols);
+        return cols * row + col;
+    }
+
+protected:
+    float *data;
+
+public:
+    const uint cols, rows;
+    const uint alignment;
+
+    Matrix(const uint cols, const uint rows, const uint alignment = DEFAULT_ALIGNMENT) : cols(cols), rows(rows), alignment(alignment)
+    {
+        data = aligned_alloc<float>(cols * rows, alignment);
+    }
+    ~Matrix()
+    {
+        free(data);
+    }
+    float &operator[](const std::tuple<uint, uint> &idx) const
+    {
+        const auto fidx = flatten_idx(std::get<0>(idx), std::get<1>(idx));
+        return data[fidx];
+    }
+
+    std::string to_string()
+    {
+        std::ostringstream res;
+        for (uint i = 0; i < rows; i++)
+        {
+            for (uint j = 0; j < rows; j++)
+            {
+                const auto fidx = flatten_idx(i, j);
+                res << data[fidx] << " ";
+            }
+            res << std::endl;
+        }
+        return res.str();
+    }
+
+    static Matrix constant(const uint rows, const uint cols, const float val, const uint alignment = DEFAULT_ALIGNMENT)
+    {
+        Matrix mat(rows, cols, alignment);
+        for (uint i = 0; i < rows * cols; i++)
+        {
+            mat.data[i] = val;
+        }
+        return mat;
+    }
+
+    cl::Buffer get_cl_buffer(DeviceHandle &handle, const int bank = XCL_MEM_DDR_BANK1)
+    {
+        cl_mem_ext_ptr_t mext_io;
+        mext_io.flags = bank;
+        mext_io.obj = data;
+        mext_io.param = 0;
+
+        // Since memory is page-aligned, we don't need to copy and cal use CL_MEM_USE_HOST_PTR
+        assert(alignment == 4096);
+        cl::Buffer buffer(handle.context, CL_MEM_EXT_PTR_XILINX | CL_MEM_USE_HOST_PTR | CL_MEM_READ_WRITE,
+                          sizeof(float) * rows * cols, &mext_io);
+        std::vector<cl::Memory> ob_io;
+        ob_io.push_back(buffer);
+
+        // we need to keep track of event so that queue can wait on this
+        cl::Event kernel_evt;
+        handle.q.enqueueMigrateMemObjects(ob_io, 0, nullptr, &kernel_evt);
+        return buffer;
+    }
+};
+
+#endif /* end of include guard: NNONFPGA_UTILS */
