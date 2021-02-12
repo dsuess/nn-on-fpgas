@@ -7,10 +7,11 @@
 #include <sstream>
 #include <vector>
 #include <CL/cl2.hpp>
+#include <nonstd/optional.hpp>
 
 typedef unsigned int uint;
 
-static const uint DEFAULT_ALIGNMENT = 32;
+static const uint DEFAULT_ALIGNMENT = 4096;
 
 typedef struct DeviceHandle
 {
@@ -43,12 +44,13 @@ private:
 
 protected:
     float *data;
+    nonstd::optional<cl::Buffer> device_buffer;
 
 public:
     const uint cols, rows;
     const uint alignment;
 
-    Matrix(const uint cols, const uint rows, const uint alignment = DEFAULT_ALIGNMENT) : cols(cols), rows(rows), alignment(alignment)
+    Matrix(const uint rows, const uint cols, const uint alignment = DEFAULT_ALIGNMENT) : cols(cols), rows(rows), alignment(alignment)
     {
         data = aligned_alloc<float>(cols * rows, alignment);
     }
@@ -67,7 +69,7 @@ public:
         std::ostringstream res;
         for (uint i = 0; i < rows; i++)
         {
-            for (uint j = 0; j < rows; j++)
+            for (uint j = 0; j < cols; j++)
             {
                 const auto fidx = flatten_idx(i, j);
                 res << data[fidx] << " ";
@@ -87,8 +89,30 @@ public:
         return mat;
     }
 
-    cl::Buffer get_cl_buffer(DeviceHandle &handle, const int bank = XCL_MEM_DDR_BANK1)
+    Matrix &clear_device_buffer()
     {
+        if (device_buffer.has_value())
+        {
+            device_buffer.reset();
+        }
+        return *this;
+    }
+
+    cl::Buffer &get_buffer()
+    {
+        if (device_buffer.has_value())
+        {
+            return device_buffer.value();
+        }
+        else
+        {
+            throw "Put data on device first";
+        }
+    }
+
+    Matrix &to_device(DeviceHandle &handle, const int bank = XCL_MEM_DDR_BANK1)
+    {
+        clear_device_buffer();
         cl_mem_ext_ptr_t mext_io;
         mext_io.flags = bank;
         mext_io.obj = data;
@@ -96,15 +120,24 @@ public:
 
         // Since memory is page-aligned, we don't need to copy and cal use CL_MEM_USE_HOST_PTR
         assert(alignment == 4096);
-        cl::Buffer buffer(handle.context, CL_MEM_EXT_PTR_XILINX | CL_MEM_USE_HOST_PTR | CL_MEM_READ_WRITE,
-                          sizeof(float) * rows * cols, &mext_io);
+        device_buffer = nonstd::optional<cl::Buffer>{cl::Buffer(handle.context, CL_MEM_EXT_PTR_XILINX | CL_MEM_USE_HOST_PTR | CL_MEM_READ_WRITE,
+                                                                sizeof(float) * rows * cols, &mext_io)};
         std::vector<cl::Memory> ob_io;
-        ob_io.push_back(buffer);
+        ob_io.push_back(device_buffer.value());
 
         // we need to keep track of event so that queue can wait on this
         cl::Event kernel_evt;
         handle.q.enqueueMigrateMemObjects(ob_io, 0, nullptr, &kernel_evt);
-        return buffer;
+        return *this;
+    }
+
+    Matrix &to_cpu(DeviceHandle &handle)
+    {
+        std::vector<cl::Memory> ob_io;
+        ob_io.push_back(device_buffer.value());
+        // we need to keep track of event so that queue can wait on this
+        handle.q.enqueueMigrateMemObjects(ob_io, CL_MIGRATE_MEM_OBJECT_HOST, nullptr, nullptr);
+        return *this;
     }
 };
 

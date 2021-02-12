@@ -1,3 +1,6 @@
 [submodule "third_party/hlslib"]
 	path = third_party/hlslib
 	url = https://github.com/definelicht/hlslib
+[submodule "third_party/optional-lite"]
+	path = third_party/optional-lite
+	url = https://github.com/martinmoene/optional-lite

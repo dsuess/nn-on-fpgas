@@ -12,7 +12,7 @@ set(CMAKE_CXX_STANDARD 11)
 add_executable(main src/main.cpp src/xcl2.cpp)
 target_include_directories(
     main PRIVATE
-    "${CMAKE_CURRENT_LIST_DIR}/../third_party/eigen/"
+    "${CMAKE_CURRENT_LIST_DIR}/../third_party/optional-lite/include"
 )
 include_directories(${Vitis_INCLUDE_DIRS})
 target_link_libraries(main ${Vitis_LIBRARIES})

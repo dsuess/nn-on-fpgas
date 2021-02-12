@@ -52,19 +52,33 @@ int main(int argc, const char *argv[])
     DeviceHandle handle = setup_handle();
     cl::Kernel kernel = load_kernel("matmul_kernel", handle);
 
-    Matrix matrixA = Matrix::constant(3, 3, 10., 4096);
-    std::cout << matrixA.to_string();
-
-    auto buffer = matrixA.get_cl_buffer(handle, XCL_MEM_DDR_BANK1);
-
-    // Setup kernel
-    // cholesky_kernel.setArg(0, dataAN);
-    // cholesky_kernel.setArg(1, buffer[0]);
-    // handle.q.finish();
-    // std::cout << "INFO: Finish kernel setup" << std::endl;
-
-    // handle.q.enqueueTask(kernel, nullptr, nullptr);
+    Matrix matrixA = Matrix::constant(2, 3, 10., 4096);
+    Matrix matrixB = Matrix::constant(3, 1, 1., 4096);
+    Matrix result = Matrix(matrixA.rows, matrixB.cols, 4096);
     handle.q.finish();
+    matrixA.to_device(handle);
+    matrixB.to_device(handle);
+    result.to_device(handle);
+    std::cout << "matrixA:\n~~~~~~~~\n"
+              << matrixA.to_string() << std::endl;
+    std::cout << "matrixB:\n~~~~~~~~\n"
+              << matrixB.to_string() << std::endl;
+
+    kernel.setArg(0, matrixA.get_buffer());
+    kernel.setArg(1, matrixB.get_buffer());
+    kernel.setArg(2, matrixA.rows);
+    kernel.setArg(3, matrixA.cols);
+    kernel.setArg(4, matrixB.cols);
+    kernel.setArg(5, result.get_buffer());
+    handle.q.finish();
+    std::cout << "INFO: Finish kernel setup" << std::endl;
+
+    handle.q.enqueueTask(kernel, nullptr, nullptr);
+    handle.q.finish();
+    result.to_cpu(handle);
+    handle.q.finish();
+    std::cout << "result:\n~~~~~~~\n"
+              << result.to_string() << std::endl;
 
     // Data transfer from device buffer to host buffer
 
