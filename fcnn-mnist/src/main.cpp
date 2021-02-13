@@ -18,6 +18,8 @@
 #include <string.h>
 #include <sys/time.h>
 #include <algorithm>
+#include <tuple>
+#include <nonstd/optional.hpp>
 
 #include "xcl2.hpp"
 #include "matrix.hpp"
@@ -36,18 +38,7 @@ DeviceHandle setup_handle()
     return result;
 }
 
-cl::Kernel load_kernel(const std::string &name, const DeviceHandle &handle)
-{
-    const std::string devName = handle.device.getInfo<CL_DEVICE_NAME>();
-    std::string xclbin_path = xcl::find_binary_file(devName, name);
-    cl::Program::Binaries xclBins = xcl::import_binary_file(xclbin_path);
-    cl::Program program(handle.context, {handle.device}, xclBins);
-    cl::Kernel kernel(program, name.c_str());
-    std::cout << "INFO: Kernel '" << name << "' has been created" << std::endl;
-    return kernel;
-}
-
-Matrix matmul(Matrix &matrixA, Matrix &matrixB, DeviceHandle &handle, cl::Kernel &kernel)
+std::pair<Matrix, cl::Event> apply_matmul(Matrix &matrixA, Matrix &matrixB, DeviceHandle &handle, cl::Kernel &kernel, std::vector<cl::Event> *wait_on = NULL)
 {
     Matrix result = Matrix(matrixA.rows, matrixB.cols, 4096);
     result.to_device(handle);
@@ -57,33 +48,57 @@ Matrix matmul(Matrix &matrixA, Matrix &matrixB, DeviceHandle &handle, cl::Kernel
     kernel.setArg(3, matrixA.cols);
     kernel.setArg(4, matrixB.cols);
     kernel.setArg(5, result.get_buffer());
-    handle.q.enqueueTask(kernel, nullptr, nullptr);
-    return result;
+
+    cl::Event event;
+    handle.q.enqueueTask(kernel, wait_on, &event);
+    return std::make_pair(std::move(result), std::move(event));
+}
+
+cl::Event apply_bias(Matrix &input, Matrix &bias, DeviceHandle &handle, cl::Kernel &kernel, std::vector<cl::Event> *wait_on = NULL)
+{
+    kernel.setArg(0, input.get_buffer());
+    kernel.setArg(1, bias.get_buffer());
+    kernel.setArg(2, input.rows);
+    kernel.setArg(3, input.cols);
+
+    cl::Event event;
+    handle.q.enqueueTask(kernel, wait_on, &event);
+    return std::move(event);
 }
 
 int main(int argc, const char *argv[])
 {
     DeviceHandle handle = setup_handle();
-    cl::Kernel kernel = load_kernel("matmul_kernel", handle);
+    const std::string devName = handle.device.getInfo<CL_DEVICE_NAME>();
+    auto xclBins = xcl::import_binary_file("xclbin/kernels.xclbin");
+    cl::Program program(handle.context, {handle.device}, xclBins);
+    cl::Kernel matmul_kernel(program, "matmul_kernel");
+    cl::Kernel bias_relu6_kernel(program, "bias_relu6_kernel");
+    cl::Kernel bias_softmax_kernel(program, "bias_softmax_kernel");
 
-    Matrix matrixA = Matrix::constant(2, 3, 10., 4096);
-    Matrix matrixB = Matrix::constant(3, 1, 1., 4096);
+    const uint batch_size = 4;
+    Matrix inputs = Matrix::constant(batch_size, 4, 1.);
+    Matrix weights = Matrix::constant(4, 2, 10);
+    Matrix biases = Matrix(2, 1);
+    biases.set_value(0, 0, 1.);
+    biases.set_value(1, 0, 2.);
+    inputs.to_device(handle);
+    weights.to_device(handle);
+    biases.to_device(handle);
     handle.q.finish();
-    matrixA.to_device(handle);
-    matrixB.to_device(handle);
-    std::cout << "matrixA:\n~~~~~~~~\n"
-              << matrixA.to_string() << std::endl;
-    std::cout << "matrixB:\n~~~~~~~~\n"
-              << matrixB.to_string() << std::endl;
-    handle.q.finish();
-    std::cout << "INFO: Finish kernel setup" << std::endl;
 
-    auto result = matmul(matrixA, matrixB, handle, kernel);
-    handle.q.finish();
-    result.to_cpu(handle);
-    handle.q.finish();
-    std::cout << "result:\n~~~~~~~\n"
-              << result.to_string() << std::endl;
+    Matrix result;
+    std::vector<cl::Event> events;
+    {
+        events.resize(1);
+        std::tie(result, events[0]) = apply_matmul(inputs, weights, handle, matmul_kernel);
+        apply_bias(result, biases, handle, bias_relu6_kernel, &events);
+        handle.q.finish();
+        result.to_cpu(handle);
+        handle.q.finish();
+        std::cout << "softmax:\n~~~~~~~\n"
+                  << result.to_string() << std::endl;
+    }
 
     // Data transfer from device buffer to host buffer
 

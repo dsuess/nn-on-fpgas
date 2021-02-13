@@ -47,21 +47,72 @@ protected:
     nonstd::optional<cl::Buffer> device_buffer;
 
 public:
-    const uint cols, rows;
-    const uint alignment;
+    uint cols, rows;
+    uint alignment;
 
+    Matrix() : cols(0), rows(0), alignment(DEFAULT_ALIGNMENT) { data = NULL; };
     Matrix(const uint rows, const uint cols, const uint alignment = DEFAULT_ALIGNMENT) : cols(cols), rows(rows), alignment(alignment)
     {
         data = aligned_alloc<float>(cols * rows, alignment);
     }
+    Matrix(const Matrix &src) : rows(src.rows), cols(src.cols), alignment(src.alignment)
+    {
+        data = aligned_alloc<float>(cols * rows, alignment);
+        device_buffer = src.device_buffer;
+        memcpy(data, src.data, rows * cols * sizeof(float));
+    }
+    Matrix(Matrix &&src) : rows(src.rows), cols(src.cols), alignment(src.alignment)
+    {
+        data = src.data;
+        device_buffer = src.device_buffer;
+        src.data = NULL;
+    }
+    Matrix &operator=(const Matrix &src)
+    {
+        if (&src != this)
+        {
+            rows = src.rows;
+            cols = src.cols;
+            alignment = src.alignment;
+            device_buffer = src.device_buffer;
+            if (data != NULL)
+            {
+                free(data);
+            }
+            data = aligned_alloc<float>(cols * rows, alignment);
+            memcpy(data, src.data, rows * cols * sizeof(float));
+        }
+    }
+    Matrix &operator=(Matrix &&src)
+    {
+        if (&src != this)
+        {
+            rows = src.rows;
+            cols = src.cols;
+            alignment = src.alignment;
+            device_buffer = src.device_buffer;
+            if (data != NULL)
+            {
+                free(data);
+            }
+            data = src.data;
+            src.data = NULL;
+        }
+        return *this;
+    }
+
     ~Matrix()
     {
-        free(data);
+        if (data != NULL)
+        {
+
+            free(data);
+        }
     }
-    float &operator[](const std::tuple<uint, uint> &idx) const
+    void set_value(const uint row, const uint col, const float val)
     {
-        const auto fidx = flatten_idx(std::get<0>(idx), std::get<1>(idx));
-        return data[fidx];
+        const auto idx = flatten_idx(row, col);
+        data[idx] = val;
     }
 
     std::string to_string()
@@ -106,7 +157,8 @@ public:
         }
         else
         {
-            throw "Put data on device first";
+            std::cerr << "Put data on device first";
+            throw -1;
         }
     }
 
@@ -124,10 +176,7 @@ public:
                                                                 sizeof(float) * rows * cols, &mext_io)};
         std::vector<cl::Memory> ob_io;
         ob_io.push_back(device_buffer.value());
-
-        // we need to keep track of event so that queue can wait on this
-        cl::Event kernel_evt;
-        handle.q.enqueueMigrateMemObjects(ob_io, 0, nullptr, &kernel_evt);
+        handle.q.enqueueMigrateMemObjects(ob_io, 0, nullptr, nullptr);
         return *this;
     }
 
@@ -135,7 +184,6 @@ public:
     {
         std::vector<cl::Memory> ob_io;
         ob_io.push_back(device_buffer.value());
-        // we need to keep track of event so that queue can wait on this
         handle.q.enqueueMigrateMemObjects(ob_io, CL_MIGRATE_MEM_OBJECT_HOST, nullptr, nullptr);
         return *this;
     }
