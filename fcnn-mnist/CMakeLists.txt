@@ -25,22 +25,28 @@ if(NOT HW_PLATFORM)
 endif()
 
 message(STATUS "HW_PLATFORM" ${HW_PLATFORM})
-add_custom_target(compile_kernel ${Vitis_COMPILER}
-                  -c -t ${TARGET} ${CMAKE_CURRENT_LIST_DIR}/src/matmul_kernel.cpp
-                  --kernel matmul_kernel
-                  --platform ${HW_PLATFORM}
-                  -o xclbin/matmul_kernel.xo
-                  BYPRODUCTS xclbin/matmul_kernel.xo
-                  )
-add_custom_target(kernel
+add_custom_target(kernels
                   CPATH=${CMAKE_CURRENT_LIST_DIR}/src
                   ${Vitis_COMPILER}
-                  -l -t ${TARGET} xclbin/matmul_kernel.xo
-                  --kernel matmul_kernel
+                  -l -t ${TARGET} xclbin/*.xo
                   --platform ${HW_PLATFORM}
-                  -o xclbin/matmul_kernel.xclbin
-                  DEPENDS compile_kernel
-                  BYPRODUCTS xclbin/matmul_kernel.xclbin)
+                  -o xclbin/kernels.xclbin
+                  BYPRODUCTS xclbin/kernels.xclbin)
+function(compile_kernel kernel_name)
+add_custom_target(compile_${kernel_name} ${Vitis_COMPILER}
+                  -c -t ${TARGET} ${CMAKE_CURRENT_LIST_DIR}/src/${kernel_name}.cpp
+                  --kernel ${kernel_name}
+                  --platform ${HW_PLATFORM}
+                  -o xclbin/${kernel_name}.xo
+                  DEPENDS ${CMAKE_CURRENT_LIST_DIR}/src/${kernel_name}.cpp
+                  BYPRODUCTS xclbin/${kernel_name}.xo
+                  )
+add_dependencies(kernels compile_${kernel_name})
+endfunction()
+
+compile_kernel(matmul_kernel)
+compile_kernel(bias_relu6_kernel)
+compile_kernel(bias_softmax_kernel)
 
 add_custom_target(emconfig.json emconfigutil --nd 1  --platform ${HW_PLATFORM})
 # add_dependencies(main kernel)
