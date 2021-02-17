@@ -85,6 +85,7 @@ public:
     }
     Matrix &operator=(Matrix &&src)
     {
+        std::cout << "Assign move";
         if (&src != this)
         {
             rows = src.rows;
@@ -183,6 +184,11 @@ public:
     Matrix &to_cpu(DeviceHandle &handle)
     {
         std::vector<cl::Memory> ob_io;
+        if (!device_buffer.has_value())
+        {
+            std::cerr << "Trying to copy values that don't exist" << std::endl;
+            throw 21;
+        }
         ob_io.push_back(device_buffer.value());
         handle.q.enqueueMigrateMemObjects(ob_io, CL_MIGRATE_MEM_OBJECT_HOST, nullptr, nullptr);
         return *this;

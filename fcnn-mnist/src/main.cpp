@@ -19,7 +19,6 @@
 #include <sys/time.h>
 #include <algorithm>
 #include <tuple>
-#include <nonstd/optional.hpp>
 
 #include "xcl2.hpp"
 #include "matrix.hpp"
@@ -40,7 +39,7 @@ DeviceHandle setup_handle()
 
 std::pair<Matrix, cl::Event> apply_matmul(Matrix &matrixA, Matrix &matrixB, DeviceHandle &handle, cl::Kernel &kernel, std::vector<cl::Event> *wait_on = NULL)
 {
-    Matrix result = Matrix(matrixA.rows, matrixB.cols, 4096);
+    Matrix result = Matrix::constant(matrixA.rows, matrixB.cols, 0.0, 4096);
     result.to_device(handle);
     kernel.setArg(0, matrixA.get_buffer());
     kernel.setArg(1, matrixB.get_buffer());
@@ -51,7 +50,7 @@ std::pair<Matrix, cl::Event> apply_matmul(Matrix &matrixA, Matrix &matrixB, Devi
 
     cl::Event event;
     handle.q.enqueueTask(kernel, wait_on, &event);
-    return std::make_pair(std::move(result), std::move(event));
+    return std::make_pair(std::move(result), event);
 }
 
 cl::Event apply_bias(Matrix &input, Matrix &bias, DeviceHandle &handle, cl::Kernel &kernel, std::vector<cl::Event> *wait_on = NULL)
@@ -76,12 +75,10 @@ int main(int argc, const char *argv[])
     cl::Kernel bias_relu6_kernel(program, "bias_relu6_kernel");
     cl::Kernel bias_softmax_kernel(program, "bias_softmax_kernel");
 
-    const uint batch_size = 4;
-    Matrix inputs = Matrix::constant(batch_size, 4, 1.);
-    Matrix weights = Matrix::constant(4, 2, 10);
-    Matrix biases = Matrix(2, 1);
-    biases.set_value(0, 0, 1.);
-    biases.set_value(1, 0, 2.);
+    const uint batch_size = 1;
+    Matrix inputs = Matrix::constant(batch_size, 2, 1.);
+    Matrix weights = Matrix::constant(2, 2, 2);
+    Matrix biases = Matrix::constant(2, 1, 5);
     inputs.to_device(handle);
     weights.to_device(handle);
     biases.to_device(handle);
@@ -89,16 +86,24 @@ int main(int argc, const char *argv[])
 
     Matrix result;
     std::vector<cl::Event> events;
-    {
-        events.resize(1);
-        std::tie(result, events[0]) = apply_matmul(inputs, weights, handle, matmul_kernel);
-        apply_bias(result, biases, handle, bias_relu6_kernel, &events);
-        handle.q.finish();
-        result.to_cpu(handle);
-        handle.q.finish();
-        std::cout << "softmax:\n~~~~~~~\n"
-                  << result.to_string() << std::endl;
-    }
+    // {
+    //     events.resize(1);
+    //     std::tie(result, events[0]) = apply_matmul(inputs, weights, handle, matmul_kernel);
+    //     //apply_bias(result, biases, handle, bias_relu6_kernel, &events);
+    //     handle.q.finish();
+    //     result.to_cpu(handle);
+    //     handle.q.finish();
+    //     std::cout << "softmax:\n~~~~~~~\n"
+    //               << result.to_string() << std::endl;
+    // }
+
+    events.resize(1);
+    std::tie(result, events[0]) = apply_matmul(weights, weights, handle, matmul_kernel);
+    handle.q.finish();
+    result.to_cpu(handle);
+    handle.q.finish();
+    std::cout << "weights**2:\n~~~~~~~\n"
+              << result.to_string() << std::endl;
 
     // Data transfer from device buffer to host buffer
 
