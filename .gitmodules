@@ -4,3 +4,9 @@
 [submodule "third_party/optional-lite"]
 	path = third_party/optional-lite
 	url = https://github.com/martinmoene/optional-lite
+[submodule "third_party/cnpy"]
+	path = third_party/cnpy
+	url = https://github.com/rogersce/cnpy
+[submodule "libnpy"]
+	path = libnpy
+	url = https://github.com/llohse/libnpy

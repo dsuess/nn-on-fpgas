@@ -8,6 +8,7 @@
 #include <vector>
 #include <CL/cl2.hpp>
 #include <nonstd/optional.hpp>
+#include "libnpy.hpp"
 
 typedef unsigned int uint;
 
@@ -85,7 +86,6 @@ public:
     }
     Matrix &operator=(Matrix &&src)
     {
-        std::cout << "Assign move";
         if (&src != this)
         {
             rows = src.rows;
@@ -138,6 +138,16 @@ public:
         {
             mat.data[i] = val;
         }
+        return mat;
+    }
+
+    static Matrix from_npy(const std::string &path)
+    {
+        int rows, cols;
+        std::vector<float> data;
+        aoba::LoadArrayFromNumpy(path, rows, cols, data);
+        Matrix mat(rows, cols);
+        memcpy(mat.data, data.data(), cols * rows * sizeof(float));
         return mat;
     }
 

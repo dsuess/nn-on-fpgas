@@ -52,7 +52,7 @@ class FCNN:
         return self.layer1.parameters() + self.layer2.parameters()
 
 
-def train(outfile: str = None, epochs: int = 1, batch_size: int = 32):
+def train(outdir: str = None, epochs: int = 1, batch_size: int = 32):
     X_train, Y_train, X_test, Y_test = fetch_mnist()
     model = FCNN(28 * 28, 10)
     optimizer = optim.Adam(model.parameters(), lr=0.01)
@@ -84,14 +84,24 @@ def train(outfile: str = None, epochs: int = 1, batch_size: int = 32):
         acc = np.concatenate(correct).mean()
         print("Accuracy:", acc)
 
-    if outfile is not None:
-        weights = {
-            "w1": model.layer1.weight.data,
-            "b1": model.layer1.bias.data,
-            "w2": model.layer2.weight.data,
-            "b2": model.layer2.bias.data
-        }
-        np.savez(outfile, **weights)
+    if not outdir:
+        return
+
+    weights = {
+        "w1": model.layer1.weight.data,
+        "b1": model.layer1.bias.data,
+        "w2": model.layer2.weight.data,
+        "b2": model.layer2.bias.data
+    }
+    Path(outdir).mkdir(exist_ok=True)
+    for name, val in weights.items():
+        np.save(Path(outdir) / f"{name}.npy", val.astype(np.float32))
+
+    order = np.argsort(Y_test[:10])
+    x = X_test[order].reshape((10, -1)).astype(np.float32) / 255
+    print(Y_test[order])
+    np.save(Path(outdir) / "samples.npy", x)
+
 
 
 if __name__ == "__main__":

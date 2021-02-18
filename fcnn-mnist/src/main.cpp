@@ -22,6 +22,7 @@
 
 #include "xcl2.hpp"
 #include "matrix.hpp"
+#include "net.hpp"
 
 DeviceHandle setup_handle()
 {
@@ -37,75 +38,19 @@ DeviceHandle setup_handle()
     return result;
 }
 
-std::pair<Matrix, cl::Event> apply_matmul(Matrix &matrixA, Matrix &matrixB, DeviceHandle &handle, cl::Kernel &kernel, std::vector<cl::Event> *wait_on = NULL)
-{
-    Matrix result = Matrix::constant(matrixA.rows, matrixB.cols, 0.0, 4096);
-    result.to_device(handle);
-    kernel.setArg(0, matrixA.get_buffer());
-    kernel.setArg(1, matrixB.get_buffer());
-    kernel.setArg(2, matrixA.rows);
-    kernel.setArg(3, matrixA.cols);
-    kernel.setArg(4, matrixB.cols);
-    kernel.setArg(5, result.get_buffer());
-
-    cl::Event event;
-    handle.q.enqueueTask(kernel, wait_on, &event);
-    return std::make_pair(std::move(result), event);
-}
-
-cl::Event apply_bias(Matrix &input, Matrix &bias, DeviceHandle &handle, cl::Kernel &kernel, std::vector<cl::Event> *wait_on = NULL)
-{
-    kernel.setArg(0, input.get_buffer());
-    kernel.setArg(1, bias.get_buffer());
-    kernel.setArg(2, input.rows);
-    kernel.setArg(3, input.cols);
-
-    cl::Event event;
-    handle.q.enqueueTask(kernel, wait_on, &event);
-    return std::move(event);
-}
-
 int main(int argc, const char *argv[])
 {
     DeviceHandle handle = setup_handle();
-    const std::string devName = handle.device.getInfo<CL_DEVICE_NAME>();
-    auto xclBins = xcl::import_binary_file("xclbin/kernels.xclbin");
-    cl::Program program(handle.context, {handle.device}, xclBins);
-    cl::Kernel matmul_kernel(program, "matmul_kernel");
-    cl::Kernel bias_relu6_kernel(program, "bias_relu6_kernel");
-    cl::Kernel bias_softmax_kernel(program, "bias_softmax_kernel");
+    init_kernels(handle);
 
-    const uint batch_size = 1;
-    Matrix inputs = Matrix::constant(batch_size, 2, 1.);
-    Matrix weights = Matrix::constant(2, 2, 2);
-    Matrix biases = Matrix::constant(2, 1, 5);
-    inputs.to_device(handle);
-    weights.to_device(handle);
-    biases.to_device(handle);
-    handle.q.finish();
+    auto model = FCNN("weights/");
+    auto input = Matrix::from_npy("weights/samples.npy");
+    input.to_device(handle);
+    auto result = model(input);
 
-    Matrix result;
-    std::vector<cl::Event> events;
-    // {
-    //     events.resize(1);
-    //     std::tie(result, events[0]) = apply_matmul(inputs, weights, handle, matmul_kernel);
-    //     //apply_bias(result, biases, handle, bias_relu6_kernel, &events);
-    //     handle.q.finish();
-    //     result.to_cpu(handle);
-    //     handle.q.finish();
-    //     std::cout << "softmax:\n~~~~~~~\n"
-    //               << result.to_string() << std::endl;
-    // }
-
-    events.resize(1);
-    std::tie(result, events[0]) = apply_matmul(weights, weights, handle, matmul_kernel);
     handle.q.finish();
     result.to_cpu(handle);
     handle.q.finish();
-    std::cout << "weights**2:\n~~~~~~~\n"
-              << result.to_string() << std::endl;
 
-    // Data transfer from device buffer to host buffer
-
-    std::cout << "DONE" << std::endl;
+    std::cout << result.to_string() << std::endl;
 }
