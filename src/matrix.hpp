@@ -110,10 +110,11 @@ public:
             free(data);
         }
     }
-    void set_value(const uint row, const uint col, const float val)
+
+    float &operator()(const uint row, const uint col)
     {
         const auto idx = flatten_idx(row, col);
-        data[idx] = val;
+        return data[idx];
     }
 
     std::string to_string()

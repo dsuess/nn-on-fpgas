@@ -52,5 +52,23 @@ int main(int argc, const char *argv[])
     result.to_cpu(handle);
     handle.q.finish();
 
-    std::cout << result.to_string() << std::endl;
+    // print argmax result
+    for (int i = 0; i < result.rows; i++)
+    {
+        float minval = -1;
+        int idx = -1;
+
+        for (int j = 0; j < result.cols; j++)
+        {
+            auto val = result(i, j);
+            if (minval < val)
+            {
+                idx = j;
+                minval = val;
+            }
+        }
+
+        std::cout << idx << " ";
+    }
+    std::cout << std::endl;
 }

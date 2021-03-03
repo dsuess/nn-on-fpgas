@@ -97,9 +97,13 @@ def train(outdir: str = None, epochs: int = 1, batch_size: int = 32):
     for name, val in weights.items():
         np.save(Path(outdir) / f"{name}.npy", val.astype(np.float32))
 
-    order = np.argsort(Y_test[:10])
-    x = X_test[order].reshape((10, -1)).astype(np.float32) / 255
-    print(Y_test[order])
+    # select one example of each class
+    indices = np.array([np.argmax(Y_test == i) for i in range(10)])
+    x = X_test[indices].reshape((10, -1)).astype(np.float32) / 255
+
+    y_pred = model(Tensor(x)).softmax().data
+    print("Model predictions:", y_pred.argmax(axis=1))
+
     np.save(Path(outdir) / "samples.npy", x)
 
 
