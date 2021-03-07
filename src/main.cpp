@@ -24,20 +24,6 @@
 #include "matrix.hpp"
 #include "net.hpp"
 
-DeviceHandle setup_handle()
-{
-    DeviceHandle result;
-    std::vector<cl::Device> devices = xcl::get_xil_devices();
-    result.device = devices[0];
-
-    // Creating Context and Command Queue for selected Device
-    result.context = cl::Context(result.device);
-    result.q = cl::CommandQueue(result.context, result.device, CL_QUEUE_PROFILING_ENABLE | CL_QUEUE_OUT_OF_ORDER_EXEC_MODE_ENABLE);
-    std::string devName = result.device.getInfo<CL_DEVICE_NAME>();
-    std::cout << "INFO: Found Device=" << devName << std::endl;
-    return result;
-}
-
 int main(int argc, const char *argv[])
 {
     DeviceHandle handle = setup_handle();

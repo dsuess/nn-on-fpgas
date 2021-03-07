@@ -9,17 +9,11 @@
 #include <CL/cl2.hpp>
 #include <nonstd/optional.hpp>
 #include "libnpy.hpp"
+#include "utils.hpp"
 
 typedef unsigned int uint;
 
 static const uint DEFAULT_ALIGNMENT = 4096;
-
-typedef struct DeviceHandle
-{
-    cl::Device device;
-    cl::CommandQueue q;
-    cl::Context context;
-} DeviceHandle;
 
 // Memory alignment
 template <typename T>
@@ -205,5 +199,33 @@ public:
         return *this;
     }
 };
+
+std::pair<Matrix, cl::Event> apply_matmul(Matrix &matrixA, Matrix &matrixB, DeviceHandle &handle, cl::Kernel &kernel, std::vector<cl::Event> *wait_on = NULL)
+{
+    Matrix result = Matrix::constant(matrixA.rows, matrixB.cols, 0.0, 4096);
+    result.to_device(handle);
+    kernel.setArg(0, matrixA.get_buffer());
+    kernel.setArg(1, matrixB.get_buffer());
+    kernel.setArg(2, matrixA.rows);
+    kernel.setArg(3, matrixA.cols);
+    kernel.setArg(4, matrixB.cols);
+    kernel.setArg(5, result.get_buffer());
+
+    cl::Event event;
+    handle.q.enqueueTask(kernel, wait_on, &event);
+    return std::make_pair(std::move(result), event);
+}
+
+cl::Event apply_bias(Matrix &input, Matrix &bias, DeviceHandle &handle, cl::Kernel &kernel, std::vector<cl::Event> *wait_on = NULL)
+{
+    kernel.setArg(0, input.get_buffer());
+    kernel.setArg(1, bias.get_buffer());
+    kernel.setArg(2, input.rows);
+    kernel.setArg(3, input.cols);
+
+    cl::Event event;
+    handle.q.enqueueTask(kernel, wait_on, &event);
+    return std::move(event);
+}
 
 #endif /* end of include guard: NNONFPGA_UTILS */

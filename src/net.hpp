@@ -1,52 +1,11 @@
 #ifndef NNONFPGA_NET
 #define NNONFPGA_NET
 
-#include <tuple>
 #include <CL/cl2.hpp>
 #include <vector>
 #include "matrix.hpp"
+#include "utils.hpp"
 #include "xcl2.hpp"
-
-std::pair<Matrix, cl::Event> apply_matmul(Matrix &matrixA, Matrix &matrixB, DeviceHandle &handle, cl::Kernel &kernel, std::vector<cl::Event> *wait_on = NULL)
-{
-    Matrix result = Matrix::constant(matrixA.rows, matrixB.cols, 0.0, 4096);
-    result.to_device(handle);
-    kernel.setArg(0, matrixA.get_buffer());
-    kernel.setArg(1, matrixB.get_buffer());
-    kernel.setArg(2, matrixA.rows);
-    kernel.setArg(3, matrixA.cols);
-    kernel.setArg(4, matrixB.cols);
-    kernel.setArg(5, result.get_buffer());
-
-    cl::Event event;
-    handle.q.enqueueTask(kernel, wait_on, &event);
-    return std::make_pair(std::move(result), event);
-}
-
-cl::Event apply_bias(Matrix &input, Matrix &bias, DeviceHandle &handle, cl::Kernel &kernel, std::vector<cl::Event> *wait_on = NULL)
-{
-    kernel.setArg(0, input.get_buffer());
-    kernel.setArg(1, bias.get_buffer());
-    kernel.setArg(2, input.rows);
-    kernel.setArg(3, input.cols);
-
-    cl::Event event;
-    handle.q.enqueueTask(kernel, wait_on, &event);
-    return std::move(event);
-}
-
-static cl::Kernel MATMUL_KERNEL, BIAS_RELU6_KERNEL, BIAS_SOFTMAX_KERNEL;
-static DeviceHandle HANDLE;
-
-void init_kernels(DeviceHandle &handle)
-{
-    HANDLE = handle;
-    auto xclBins = xcl::import_binary_file("xclbin/kernels.xclbin");
-    cl::Program program(handle.context, {handle.device}, xclBins);
-    MATMUL_KERNEL = cl::Kernel(program, "matmul_kernel");
-    BIAS_RELU6_KERNEL = cl::Kernel(program, "bias_relu6_kernel");
-    BIAS_SOFTMAX_KERNEL = cl::Kernel(program, "bias_softmax_kernel");
-}
 
 class FCNN
 {

@@ -10,3 +10,6 @@
 [submodule "libnpy"]
 	path = libnpy
 	url = https://github.com/llohse/libnpy
+[submodule "third_party/googletest"]
+	path = third_party/googletest
+	url = https://github.com/google/googletest.git
