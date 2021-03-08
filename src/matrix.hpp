@@ -15,6 +15,13 @@ typedef unsigned int uint;
 
 static const uint DEFAULT_ALIGNMENT = 4096;
 
+#ifdef HW_EMU_MODE
+// Hardware emulation doesn't work with any other bank
+static const int DEFAULT_MEMORY_BANK = XCL_MEM_DDR_BANK1;
+#else
+static const int DEFAULT_MEMORY_BANK = XCL_MEM_DDR_BANK0;
+#endif
+
 // Memory alignment
 template <typename T>
 T *aligned_alloc(std::size_t num, std::size_t alignment = DEFAULT_ALIGNMENT)
@@ -168,7 +175,7 @@ public:
         }
     }
 
-    Matrix &to_device(DeviceHandle &handle = HANDLE, const int bank = XCL_MEM_DDR_BANK1)
+    Matrix &to_device(DeviceHandle &handle = HANDLE, const int bank = DEFAULT_MEMORY_BANK)
     {
         clear_device_buffer();
         cl_mem_ext_ptr_t mext_io;

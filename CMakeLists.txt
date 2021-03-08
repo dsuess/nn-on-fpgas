@@ -14,6 +14,11 @@ if(NOT HW_PLATFORM)
    set(HW_PLATFORM $ENV{AWS_PLATFORM})
 endif()
 
+if(${TARGET} MATCHES "hw_emu")
+    add_compile_definitions(HW_EMU_MODE)
+endif()
+
+
 
 ## Kernels #####################################################################
 message(STATUS "HW_PLATFORM" ${HW_PLATFORM})
