@@ -26,17 +26,16 @@
 
 int main(int argc, const char *argv[])
 {
-    DeviceHandle handle = setup_handle();
-    init_kernels(handle);
+    init_kernels();
 
     auto model = FCNN("weights/");
     auto input = Matrix::from_npy("weights/samples.npy");
-    input.to_device(handle);
+    input.to_device();
     auto result = model(input);
 
-    handle.q.finish();
-    result.to_cpu(handle);
-    handle.q.finish();
+    finish_cl_queue();
+    result.to_cpu();
+    finish_cl_queue();
 
     // print argmax result
     for (int i = 0; i < result.rows; i++)

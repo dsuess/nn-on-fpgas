@@ -168,7 +168,7 @@ public:
         }
     }
 
-    Matrix &to_device(DeviceHandle &handle, const int bank = XCL_MEM_DDR_BANK1)
+    Matrix &to_device(DeviceHandle &handle = HANDLE, const int bank = XCL_MEM_DDR_BANK1)
     {
         clear_device_buffer();
         cl_mem_ext_ptr_t mext_io;
@@ -186,7 +186,7 @@ public:
         return *this;
     }
 
-    Matrix &to_cpu(DeviceHandle &handle)
+    Matrix &to_cpu(DeviceHandle &handle = HANDLE)
     {
         std::vector<cl::Memory> ob_io;
         if (!device_buffer.has_value())
@@ -200,7 +200,7 @@ public:
     }
 };
 
-std::pair<Matrix, cl::Event> apply_matmul(Matrix &matrixA, Matrix &matrixB, DeviceHandle &handle, cl::Kernel &kernel, std::vector<cl::Event> *wait_on = NULL)
+std::pair<Matrix, cl::Event> apply_matmul(Matrix &matrixA, Matrix &matrixB, cl::Kernel &kernel, std::vector<cl::Event> *wait_on = NULL, DeviceHandle &handle = HANDLE)
 {
     Matrix result = Matrix::constant(matrixA.rows, matrixB.cols, 0.0, 4096);
     result.to_device(handle);
@@ -216,7 +216,7 @@ std::pair<Matrix, cl::Event> apply_matmul(Matrix &matrixA, Matrix &matrixB, Devi
     return std::make_pair(std::move(result), event);
 }
 
-cl::Event apply_bias(Matrix &input, Matrix &bias, DeviceHandle &handle, cl::Kernel &kernel, std::vector<cl::Event> *wait_on = NULL)
+cl::Event apply_bias(Matrix &input, Matrix &bias, cl::Kernel &kernel, std::vector<cl::Event> *wait_on = NULL, DeviceHandle &handle = HANDLE)
 {
     kernel.setArg(0, input.get_buffer());
     kernel.setArg(1, bias.get_buffer());

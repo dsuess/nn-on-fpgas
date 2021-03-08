@@ -2,7 +2,6 @@
 #define nn_on_fpga_utils
 
 #include <iostream>
-#include <tuple>
 #include "xcl2.hpp"
 
 typedef struct DeviceHandle
@@ -14,16 +13,6 @@ typedef struct DeviceHandle
 
 static cl::Kernel MATMUL_KERNEL, BIAS_RELU6_KERNEL, BIAS_SOFTMAX_KERNEL;
 static DeviceHandle HANDLE;
-
-void init_kernels(DeviceHandle &handle)
-{
-    HANDLE = handle;
-    auto xclBins = xcl::import_binary_file("xclbin/kernels.xclbin");
-    cl::Program program(handle.context, {handle.device}, xclBins);
-    MATMUL_KERNEL = cl::Kernel(program, "matmul_kernel");
-    BIAS_RELU6_KERNEL = cl::Kernel(program, "bias_relu6_kernel");
-    BIAS_SOFTMAX_KERNEL = cl::Kernel(program, "bias_softmax_kernel");
-}
 
 DeviceHandle setup_handle()
 {
@@ -37,6 +26,21 @@ DeviceHandle setup_handle()
     std::string devName = result.device.getInfo<CL_DEVICE_NAME>();
     std::cout << "INFO: Found Device=" << devName << std::endl;
     return result;
+}
+
+void init_kernels()
+{
+    HANDLE = setup_handle();
+    auto xclBins = xcl::import_binary_file("xclbin/kernels.xclbin");
+    cl::Program program(HANDLE.context, {HANDLE.device}, xclBins);
+    MATMUL_KERNEL = cl::Kernel(program, "matmul_kernel");
+    BIAS_RELU6_KERNEL = cl::Kernel(program, "bias_relu6_kernel");
+    BIAS_SOFTMAX_KERNEL = cl::Kernel(program, "bias_softmax_kernel");
+}
+
+void finish_cl_queue()
+{
+    HANDLE.q.finish();
 }
 
 #endif /* end of include guard: nn_on_fpga_utils */
