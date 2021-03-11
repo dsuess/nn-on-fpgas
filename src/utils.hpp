@@ -2,7 +2,16 @@
 #define nn_on_fpga_utils
 
 #include <iostream>
+#include <string>
 #include "xcl2.hpp"
+
+
+#ifdef HW_MODE_ON
+static const std::string KERNELS_BIN = "xclbin/kernels.awsxclbin";
+#else
+// Hardware emulation doesn't work with any other bank
+static const std::string KERNELS_BIN = "xclbin/kernels.xclbin";
+#endif
 
 typedef struct DeviceHandle
 {
@@ -31,7 +40,8 @@ DeviceHandle setup_handle()
 void init_kernels()
 {
     HANDLE = setup_handle();
-    auto xclBins = xcl::import_binary_file("xclbin/kernels.xclbin");
+    auto xclBins = xcl::import_binary_file(KERNELS_BIN);
+    std::cout << "Loaded kernels from " << KERNELS_BIN << std::endl;
     cl::Program program(HANDLE.context, {HANDLE.device}, xclBins);
     MATMUL_KERNEL = cl::Kernel(program, "matmul_kernel");
     BIAS_RELU6_KERNEL = cl::Kernel(program, "bias_relu6_kernel");

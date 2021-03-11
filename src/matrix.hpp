@@ -15,11 +15,11 @@ typedef unsigned int uint;
 
 static const uint DEFAULT_ALIGNMENT = 4096;
 
-#ifdef HW_EMU_MODE
+#ifdef HW_MODE_ON
+static const int DEFAULT_MEMORY_BANK = XCL_MEM_DDR_BANK0;
+#else
 // Hardware emulation doesn't work with any other bank
 static const int DEFAULT_MEMORY_BANK = XCL_MEM_DDR_BANK1;
-#else
-static const int DEFAULT_MEMORY_BANK = XCL_MEM_DDR_BANK0;
 #endif
 
 // Memory alignment
