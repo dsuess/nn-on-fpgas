@@ -12,8 +12,8 @@
 int main(int argc, const char *argv[]) {
   init_kernels();
 
-  auto model = FCNN("weights/");
-  auto input = Matrix::from_npy("weights/samples.npy");
+  auto model = FCNN("../weights/");
+  auto input = Matrix::from_npy("../weights/samples.npy");
   input.to_device();
   auto result = model(input);
 
