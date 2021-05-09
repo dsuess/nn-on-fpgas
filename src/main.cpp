@@ -5,9 +5,9 @@
 #include <iostream>
 #include <tuple>
 
+#include "xcl2.hpp"
 #include "matrix.hpp"
 #include "net.hpp"
-#include "xcl2.hpp"
 
 int main(int argc, const char *argv[]) {
   init_kernels();
