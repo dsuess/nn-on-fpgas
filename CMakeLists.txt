@@ -14,7 +14,9 @@ if(NOT HW_PLATFORM)
    set(HW_PLATFORM $ENV{AWS_PLATFORM})
 endif()
 
-if(${TARGET} MATCHES "hw")
+# Matches hw but not hw_emu
+if(${TARGET} MATCHES "hw$")
+    message(STATUS "Setting HW_MODE_ON" ${TARGET})
     add_compile_definitions(HW_MODE_ON)
 endif()
 
