@@ -1,6 +1,14 @@
 Examples for the "From Scratch: Neural Network inference on FPGAs" series
 =========================================================================
 
+This repo contains the code samples for the ["From Scratch: Neural Network inference on FPGAs"](https://dsuess.github.io/blog/2021-05-09-fpga-part-1/) posts.
+
+
+### Setup
+
+The examples have been tested on AWS F1 instances using the FPGA AMI for development.
+See the [first post](https://dsuess.github.io/blog/2021-05-09-fpga-part-1/) for detailed instructions how to run them.
+
 ### Weights
 
 The weights in the `weights/` folder were generated running
